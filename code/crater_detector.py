@@ -13,6 +13,9 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Dict
 
+# Default folder name for auto-generated sample data
+DEFAULT_SAMPLE_FOLDER = "sample_data"
+
 
 class CraterDetector:
     """
@@ -540,7 +543,7 @@ Expected data structure:
     parser.add_argument(
         '--auto_generate',
         action='store_true',
-        help='Automatically generate sample data in "sample_data/" folder if data_folder does not exist, then run detection'
+        help=f'Automatically generate sample data in "{DEFAULT_SAMPLE_FOLDER}/" folder if data_folder does not exist, then run detection'
     )
     
     args = parser.parse_args()
@@ -561,15 +564,14 @@ Expected data structure:
     # Handle auto_generate: if data folder doesn't exist, generate sample data
     data_path = Path(args.data_folder)
     if not data_path.exists() and args.auto_generate:
-        sample_folder = "sample_data"
         print(f"Data folder '{args.data_folder}' does not exist.")
-        print(f"Auto-generating sample data in '{sample_folder}/'...")
-        success = generate_sample_data(sample_folder)
+        print(f"Auto-generating sample data in '{DEFAULT_SAMPLE_FOLDER}/'...")
+        success = generate_sample_data(DEFAULT_SAMPLE_FOLDER)
         if not success:
             print("Failed to generate sample data.")
             sys.exit(1)
-        # Use the generated sample_data folder instead
-        args.data_folder = sample_folder
+        # Use the generated sample folder instead
+        args.data_folder = DEFAULT_SAMPLE_FOLDER
         print()
     
     # Create detector
