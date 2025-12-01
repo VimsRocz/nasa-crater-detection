@@ -9,10 +9,9 @@ Description: Computer vision solution for detecting and classifying crater rims
 import cv2
 import numpy as np
 import pandas as pd
-import os
+import sys
 from pathlib import Path
 from typing import List, Tuple, Dict
-import csv
 
 
 class CraterDetector:
@@ -238,54 +237,132 @@ class CraterDetector:
         
         return detected_craters
     
-    def process_dataset(self, data_folder: str, output_file: str):
+    def validate_data_folder(self, data_folder: str) -> Tuple[bool, str, List[Path]]:
+        """
+        Validate that the data folder exists and contains the expected structure.
+        
+        Args:
+            data_folder: Path to folder containing test images
+            
+        Returns:
+            Tuple of (is_valid, error_message, list_of_image_files)
+        """
+        data_path = Path(data_folder)
+        
+        # Check if path exists
+        if not data_path.exists():
+            return False, f"Error: Data folder '{data_folder}' does not exist.", []
+        
+        # Check if it's a directory
+        if not data_path.is_dir():
+            return False, f"Error: '{data_folder}' is not a directory.", []
+        
+        # Look for altitude folders
+        altitude_folders = list(data_path.glob('altitude*'))
+        
+        if not altitude_folders:
+            # Check if there are any PNG images directly or in subdirectories
+            all_pngs = list(data_path.rglob('*.png'))
+            if all_pngs:
+                return False, (
+                    f"Error: Found {len(all_pngs)} PNG files, but the folder structure is incorrect.\n"
+                    f"Expected structure: {data_folder}/altitude*/longitude*/*.png\n"
+                    f"Found images at: {all_pngs[0].parent if all_pngs else 'N/A'}"
+                ), []
+            else:
+                return False, (
+                    f"Error: No data found in '{data_folder}'.\n"
+                    f"Expected folder structure: {data_folder}/altitude*/longitude*/*.png\n"
+                    f"Please ensure your data follows this hierarchical structure."
+                ), []
+        
+        # Collect all valid image files
+        image_files = []
+        for altitude_folder in sorted(altitude_folders):
+            for longitude_folder in sorted(altitude_folder.glob('longitude*')):
+                for image_file in sorted(longitude_folder.glob('*.png')):
+                    if '_mask' not in image_file.name and '_truth' not in image_file.name:
+                        image_files.append(image_file)
+        
+        if not image_files:
+            return False, (
+                f"Error: Found altitude folders but no valid PNG images.\n"
+                f"Looking for: {data_folder}/altitude*/longitude*/*.png\n"
+                f"Excluding files with '_mask' or '_truth' in the name."
+            ), []
+        
+        return True, "", image_files
+
+    def process_dataset(self, data_folder: str, output_file: str) -> bool:
         """
         Process entire dataset and generate CSV output.
         
         Args:
             data_folder: Path to folder containing test images
             output_file: Path to output CSV file
+            
+        Returns:
+            True if processing was successful, False otherwise
         """
-        results = []
+        # Validate data folder first
+        is_valid, error_msg, image_files = self.validate_data_folder(data_folder)
         
-        # Walk through directory structure
+        if not is_valid:
+            print(error_msg)
+            print("\nTo get started, you can:")
+            print("1. Download the official NASA crater dataset from Topcoder")
+            print("2. Use --generate_sample to create sample test data")
+            print("3. Ensure your data follows the required structure:")
+            print("   data_folder/")
+            print("   ├── altitude01/")
+            print("   │   ├── longitude01/")
+            print("   │   │   ├── image1.png")
+            print("   │   │   └── image2.png")
+            print("   │   └── longitude02/")
+            print("   │       └── ...")
+            print("   └── altitude02/")
+            print("       └── ...")
+            return False
+        
+        print(f"Found {len(image_files)} images to process.")
+        
+        results = []
         data_path = Path(data_folder)
         
-        for altitude_folder in sorted(data_path.glob('altitude*')):
-            for longitude_folder in sorted(altitude_folder.glob('longitude*')):
-                # Process all PNG images in this folder
-                for image_file in sorted(longitude_folder.glob('*.png')):
-                    # Skip mask and truth files
-                    if '_mask' in image_file.name or '_truth' in image_file.name:
-                        continue
-                    
-                    print(f"Processing: {image_file}")
-                    
-                    # Construct image ID
-                    altitude = altitude_folder.name
-                    longitude = longitude_folder.name
-                    filename = image_file.stem  # filename without extension
-                    image_id = f"{altitude}/{longitude}/{filename}"
-                    
-                    # Detect craters
-                    craters = self.detect_craters_in_image(str(image_file))
-                    
-                    if len(craters) == 0:
-                        # No craters detected - add special case entry
-                        results.append({
-                            'ellipseCenterX(px)': -1,
-                            'ellipseCenterY(px)': -1,
-                            'ellipseSemimajor(px)': -1,
-                            'ellipseSemiminor(px)': -1,
-                            'ellipseRotation(deg)': -1,
-                            'inputImage': image_id,
-                            'crater_classification': -1
-                        })
-                    else:
-                        # Add image ID to each crater detection
-                        for crater in craters:
-                            crater['inputImage'] = image_id
-                            results.append(crater)
+        for image_file in image_files:
+            print(f"Processing: {image_file}")
+            
+            # Construct image ID from folder structure
+            rel_path = image_file.relative_to(data_path)
+            parts = rel_path.parts
+            if len(parts) >= 3:
+                altitude = parts[0]
+                longitude = parts[1]
+                filename = image_file.stem  # filename without extension
+                image_id = f"{altitude}/{longitude}/{filename}"
+            else:
+                # Fallback for unexpected structure
+                image_id = image_file.stem
+            
+            # Detect craters
+            craters = self.detect_craters_in_image(str(image_file))
+            
+            if len(craters) == 0:
+                # No craters detected - add special case entry
+                results.append({
+                    'ellipseCenterX(px)': -1,
+                    'ellipseCenterY(px)': -1,
+                    'ellipseSemimajor(px)': -1,
+                    'ellipseSemiminor(px)': -1,
+                    'ellipseRotation(deg)': -1,
+                    'inputImage': image_id,
+                    'crater_classification': -1
+                })
+            else:
+                # Add image ID to each crater detection
+                for crater in craters:
+                    crater['inputImage'] = image_id
+                    results.append(crater)
         
         # Write results to CSV
         if len(results) > 0:
@@ -304,8 +381,107 @@ class CraterDetector:
             df.to_csv(output_file, index=False)
             print(f"\nResults saved to {output_file}")
             print(f"Total detections: {len(results)}")
+            return True
         else:
-            print("No results to save.")
+            print("No detections found in the processed images.")
+            return True
+
+
+def generate_sample_data(output_folder: str) -> bool:
+    """
+    Generate sample test images with synthetic crater-like features
+    for testing the crater detection pipeline.
+    
+    Args:
+        output_folder: Path to folder where sample data will be created
+        
+    Returns:
+        True if generation was successful, False otherwise
+    """
+    output_path = Path(output_folder)
+    
+    try:
+        # Create directory structure
+        sample_path = output_path / "altitude01" / "longitude01"
+        sample_path.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Creating sample data in: {output_path}")
+        
+        # Generate sample images with synthetic craters
+        for i in range(3):
+            # Create a grayscale image simulating lunar surface
+            img_size = 512
+            image = np.random.randint(80, 120, (img_size, img_size), dtype=np.uint8)
+            
+            # Add some noise/texture
+            noise = np.random.normal(0, 10, (img_size, img_size))
+            image = np.clip(image + noise, 0, 255).astype(np.uint8)
+            
+            # Add 2-4 synthetic craters per image
+            num_craters = np.random.randint(2, 5)
+            
+            for j in range(num_craters):
+                # Random crater position (ensuring it's fully visible)
+                margin = 100
+                center_x = np.random.randint(margin, img_size - margin)
+                center_y = np.random.randint(margin, img_size - margin)
+                
+                # Random crater size (semi-axes)
+                semi_major = np.random.randint(45, 80)
+                semi_minor = np.random.randint(42, semi_major)
+                
+                # Random rotation
+                rotation = np.random.randint(0, 180)
+                
+                # Draw crater rim (ellipse)
+                cv2.ellipse(
+                    image,
+                    (center_x, center_y),
+                    (semi_major, semi_minor),
+                    rotation,
+                    0, 360,
+                    color=50,  # Darker rim
+                    thickness=3
+                )
+                
+                # Add shadow effect (darker on one side)
+                shadow_offset = 5
+                cv2.ellipse(
+                    image,
+                    (center_x + shadow_offset, center_y + shadow_offset),
+                    (semi_major - 5, semi_minor - 5),
+                    rotation,
+                    180, 270,
+                    color=40,
+                    thickness=2
+                )
+                
+                # Add lighter interior
+                cv2.ellipse(
+                    image,
+                    (center_x, center_y),
+                    (semi_major - 10, semi_minor - 10),
+                    rotation,
+                    0, 360,
+                    color=130,
+                    thickness=-1
+                )
+            
+            # Apply slight blur to make it more realistic
+            image = cv2.GaussianBlur(image, (3, 3), 0)
+            
+            # Save the image
+            image_path = sample_path / f"orientation0{i+1}_light01.png"
+            cv2.imwrite(str(image_path), image)
+            print(f"  Created: {image_path}")
+        
+        print(f"\nSample data created successfully!")
+        print(f"You can now run: python crater_detector.py --data_folder {output_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Error creating sample data: {e}")
+        return False
 
 
 def main():
@@ -315,13 +491,35 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description='NASA Lunar Crater Detection Challenge Solution'
+        description='NASA Lunar Crater Detection Challenge Solution',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate sample data for testing
+  python crater_detector.py --generate_sample ./sample_data
+
+  # Run detection on sample data
+  python crater_detector.py --data_folder ./sample_data --output solution.csv
+
+  # Run detection on real data
+  python crater_detector.py --data_folder /path/to/nasa/data --output solution.csv
+
+Expected data structure:
+  data_folder/
+  ├── altitude01/
+  │   ├── longitude01/
+  │   │   ├── orientation01_light01.png
+  │   │   └── orientation01_light02.png
+  │   └── longitude02/
+  │       └── ...
+  └── altitude02/
+      └── ...
+        """
     )
     parser.add_argument(
         '--data_folder',
         type=str,
-        required=True,
-        help='Path to test data folder'
+        help='Path to test data folder containing images'
     )
     parser.add_argument(
         '--output',
@@ -329,16 +527,39 @@ def main():
         default='solution.csv',
         help='Output CSV file path (default: solution.csv)'
     )
+    parser.add_argument(
+        '--generate_sample',
+        type=str,
+        metavar='PATH',
+        help='Generate sample test data in the specified folder for testing'
+    )
     
     args = parser.parse_args()
+    
+    # Handle sample data generation
+    if args.generate_sample:
+        print("Generating sample test data...")
+        success = generate_sample_data(args.generate_sample)
+        if not success:
+            sys.exit(1)
+        return
+    
+    # Validate that data_folder is provided for detection
+    if not args.data_folder:
+        parser.error("--data_folder is required for crater detection. "
+                    "Use --generate_sample to create test data first.")
     
     # Create detector
     detector = CraterDetector()
     
     # Process dataset
     print("Starting crater detection...")
-    detector.process_dataset(args.data_folder, args.output)
-    print("Detection complete!")
+    success = detector.process_dataset(args.data_folder, args.output)
+    if success:
+        print("Detection complete!")
+    else:
+        print("\nDetection could not be completed. Please check the error messages above.")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

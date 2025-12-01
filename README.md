@@ -80,10 +80,31 @@ Run the crater detector on a test dataset:
 python code/crater_detector.py --data_folder /path/to/test/data --output solution.csv
 ```
 
+### Quick Start with Sample Data
+
+If you don't have the NASA dataset yet, you can generate sample test data to try out the detector:
+
+```bash
+# Step 1: Generate sample data
+python code/crater_detector.py --generate_sample ./sample_data
+
+# Step 2: Run detection on sample data
+python code/crater_detector.py --data_folder ./sample_data --output solution.csv
+```
+
 ### Command Line Arguments
 
-- `--data_folder`: **(Required)** Path to the folder containing test images
+- `--data_folder`: Path to the folder containing test images (required for detection)
 - `--output`: **(Optional)** Output CSV file path (default: `solution.csv`)
+- `--generate_sample`: **(Optional)** Generate sample test data in the specified folder for testing
+
+### Getting the Real Dataset
+
+The official NASA crater dataset can be obtained from Topcoder:
+1. Visit the [Topcoder Challenge Page](https://www.topcoder.com/challenges/e53d30e9-c4b1-40bc-b834-f92483a73223)
+2. Download the training/test data
+3. Extract the data maintaining the folder structure
+4. Run the detector with the path to your extracted data
 
 ### Input Data Structure
 
@@ -101,6 +122,8 @@ test_data/
 └── altitude02/
     └── ...
 ```
+
+**Note:** The script will display helpful error messages if your data folder doesn't exist or doesn't follow the expected structure.
 
 ### Output Format
 
