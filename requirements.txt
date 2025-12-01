@@ -1,0 +1,11 @@
+# NASA Lunar Crater Detection Challenge - Python Dependencies
+# Python 3.12 or higher required
+
+# Computer Vision
+opencv-python>=4.8.0
+
+# Numerical Computing
+numpy>=1.24.0
+
+# Data Processing
+pandas>=2.0.0
