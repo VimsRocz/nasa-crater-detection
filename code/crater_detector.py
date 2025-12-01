@@ -312,7 +312,8 @@ class CraterDetector:
             print("\nTo get started, you can:")
             print("1. Download the official NASA crater dataset from Topcoder")
             print("2. Use --generate_sample to create sample test data")
-            print("3. Ensure your data follows the required structure:")
+            print("3. Use --auto_generate to automatically generate sample data and run detection")
+            print("4. Ensure your data follows the required structure:")
             print("   data_folder/")
             print("   ├── altitude01/")
             print("   │   ├── longitude01/")
@@ -504,6 +505,9 @@ Examples:
   # Run detection on real data
   python crater_detector.py --data_folder /path/to/nasa/data --output solution.csv
 
+  # Auto-generate sample data if data folder doesn't exist, then run detection
+  python crater_detector.py --data_folder /path/to/test/data --auto_generate --output solution.csv
+
 Expected data structure:
   data_folder/
   ├── altitude01/
@@ -533,6 +537,11 @@ Expected data structure:
         metavar='PATH',
         help='Generate sample test data in the specified folder for testing'
     )
+    parser.add_argument(
+        '--auto_generate',
+        action='store_true',
+        help='Automatically generate sample data in "sample_data/" folder if data_folder does not exist, then run detection'
+    )
     
     args = parser.parse_args()
     
@@ -548,6 +557,20 @@ Expected data structure:
     if not args.data_folder:
         parser.error("--data_folder is required for crater detection. "
                     "Use --generate_sample to create test data first.")
+    
+    # Handle auto_generate: if data folder doesn't exist, generate sample data
+    data_path = Path(args.data_folder)
+    if not data_path.exists() and args.auto_generate:
+        sample_folder = "sample_data"
+        print(f"Data folder '{args.data_folder}' does not exist.")
+        print(f"Auto-generating sample data in '{sample_folder}/'...")
+        success = generate_sample_data(sample_folder)
+        if not success:
+            print("Failed to generate sample data.")
+            sys.exit(1)
+        # Use the generated sample_data folder instead
+        args.data_folder = sample_folder
+        print()
     
     # Create detector
     detector = CraterDetector()
