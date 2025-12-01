@@ -426,9 +426,9 @@ def generate_sample_data(output_folder: str) -> bool:
                 center_x = np.random.randint(margin, img_size - margin)
                 center_y = np.random.randint(margin, img_size - margin)
                 
-                # Random crater size (semi-axes)
-                semi_major = np.random.randint(45, 80)
-                semi_minor = np.random.randint(42, semi_major)
+                # Random crater size (semi-axes) - ensure minimum values for interior drawing
+                semi_major = np.random.randint(50, 80)
+                semi_minor = np.random.randint(45, semi_major + 1)
                 
                 # Random rotation
                 rotation = np.random.randint(0, 180)
@@ -449,7 +449,7 @@ def generate_sample_data(output_folder: str) -> bool:
                 cv2.ellipse(
                     image,
                     (center_x + shadow_offset, center_y + shadow_offset),
-                    (semi_major - 5, semi_minor - 5),
+                    (max(semi_major - 5, 10), max(semi_minor - 5, 10)),
                     rotation,
                     180, 270,
                     color=40,
@@ -460,7 +460,7 @@ def generate_sample_data(output_folder: str) -> bool:
                 cv2.ellipse(
                     image,
                     (center_x, center_y),
-                    (semi_major - 10, semi_minor - 10),
+                    (max(semi_major - 10, 5), max(semi_minor - 10, 5)),
                     rotation,
                     0, 360,
                     color=130,
@@ -471,7 +471,7 @@ def generate_sample_data(output_folder: str) -> bool:
             image = cv2.GaussianBlur(image, (3, 3), 0)
             
             # Save the image
-            image_path = sample_path / f"orientation0{i+1}_light01.png"
+            image_path = sample_path / f"orientation{i+1:02d}_light01.png"
             cv2.imwrite(str(image_path), image)
             print(f"  Created: {image_path}")
         
