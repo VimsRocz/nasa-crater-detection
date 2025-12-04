@@ -209,3 +209,24 @@ __marimo__/
 # Generated sample data and output files
 sample_data/
 solution.csv
+
+# NASA Crater Detection Dataset Files
+# Large tar files and extracted data folders (19GB+)
+*.tar
+*.tar.gz
+train/
+train-sample/
+test/
+Data/
+data/
+
+# Ground truth and output files
+train-gt.csv
+test-gt.csv
+*.csv
+!requirements.txt
+
+# Sample data from AWS S3
+sample-submission.zip
+scorer.py
+data_combiner.py
