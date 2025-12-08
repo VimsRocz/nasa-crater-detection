@@ -662,6 +662,7 @@ def display_data_configuration():
             print(f"     Suggested Output: {info.get('suggested_output', 'N/A')}")
     
     print("\n" + "-" * 70)
+    
     print("\n📊 RESULTS OUTPUT DIRECTORY:")
     results_path = Path("results")
     if results_path.exists():
