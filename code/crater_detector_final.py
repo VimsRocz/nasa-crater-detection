@@ -41,28 +41,28 @@ DATASET_INFO = {
         'description': 'Small training set (50 images, ~234 MB)',
         'has_ground_truth': True,
         'purpose': 'Quick testing and parameter tuning',
-        'suggested_output': 'results\\train-sample_detections.csv'
+        'suggested_output': 'results/train-sample_detections.csv'
     },
     'train': {
         'name': 'Full Training Set',
         'description': 'Complete training data (requires extracting train.tar, ~19 GB)',
         'has_ground_truth': True,
         'purpose': 'Full model evaluation and validation',
-        'suggested_output': 'results\\train_full_detections.csv'
+        'suggested_output': 'results/train_full_detections.csv'
     },
     'test': {
         'name': 'Test Set',
         'description': 'Test data for submission (requires extracting test.tar, ~3.3 GB)',
         'has_ground_truth': False,
         'purpose': 'Generate final submission file',
-        'suggested_output': 'results\\solution.csv'
+        'suggested_output': 'results/solution.csv'
     },
     'sample-submission': {
         'name': 'Sample Submission',
         'description': 'Example submission format and reference code',
         'has_ground_truth': False,
         'purpose': 'Reference for submission format',
-        'suggested_output': 'results\\sample_solution.csv'
+        'suggested_output': 'results/sample_solution.csv'
     }
 }
 
@@ -171,7 +171,7 @@ class DatasetLoader:
                 'is_valid': info['is_valid'],
                 'has_ground_truth': info.get('has_ground_truth', False),
                 'path': str(info['path']),
-                'suggested_output': info.get('suggested_output', 'results\\detections.csv')
+                'suggested_output': info.get('suggested_output', 'results/detections.csv')
             }
             for key, info in self.available_datasets.items()
         ]
@@ -1176,19 +1176,19 @@ def main():
         epilog="""
 Examples (run from repo root: C:\\Users\\vimsr\\Desktop\\nasa-crater-detection):
   # Run on training sample data and evaluate
-  python code\\crater_detector_final.py --data_folder data\\train-sample --output results\\detections.csv --evaluate
+  python code/crater_detector_final.py --data_folder data\train-sample --output results/detections.csv --evaluate
 
   # Run on full training data (if available)
-  python code\\crater_detector_final.py --data_folder data\\train --output results\\train_detections.csv --evaluate
+  python code/crater_detector_final.py --data_folder data\train --output results/train_detections.csv --evaluate
 
   # Run on test data for submission
-  python code\\crater_detector_final.py --data_folder data\\test --output results\\solution.csv
+  python code/crater_detector_final.py --data_folder data\test --output results/solution.csv
 
   # Auto-generate sample data and test
-  python code\\crater_detector_final.py --auto_generate
+  python code/crater_detector_final.py --auto_generate
 
 Data Folder Options (relative to project root):
-  - Small training set: data\\train-sample
+  - Small training set: data/train-sample
   - Full training set:  data\\train (requires extracting train.tar)
   - Test set:           data\\test (requires extracting test.tar)
 
@@ -1206,7 +1206,7 @@ Expected data structure within the specified data_folder:
         """
     )
     parser.add_argument('--data_folder', type=str, 
-                       help='Path to data folder containing altitude/longitude hierarchy (e.g., data\\train-sample, data\\train, data\\test)')
+                       help='Path to data folder containing altitude/longitude hierarchy (e.g., data/train-sample, data/train, data/test)')
     parser.add_argument('--output', type=str, default='solution.csv',
                        help='Output CSV file path (default: solution.csv)')
     parser.add_argument('--generate_sample', type=str, metavar='PATH',
@@ -1284,7 +1284,7 @@ Expected data structure within the specified data_folder:
             print("ERROR: No data folder specified!")
             print("="*70)
             print("\nQuick start (from repo root):")
-            print("  python code\\crater_detector_final.py --data_folder data\\train-sample --output results\\detections.csv --evaluate")
+            print("  python code/crater_detector_final.py --data_folder data\train-sample --output results/detections.csv --evaluate")
             sys.exit(1)
     
     # ========================================================================
@@ -1399,7 +1399,7 @@ Expected data structure within the specified data_folder:
 
                 print(f'Overall Score: {final_score}')
                 # Assuming 'results' folder for score output if args.out_dir is not provided
-                score_output_dir = Path("results/scorer-out") # Default path
+                score_output_dir = Path("results/score") # Default path
                 score_output_dir.mkdir(parents=True, exist_ok=True)
                 writeScore(final_score, str(score_output_dir)) # Pass path to writeScore
 
