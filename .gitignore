@@ -13,7 +13,7 @@ __pycache__/
 *.pyc
 
 # Results
-results/
+
 
 # PDFs
 *.pdf
