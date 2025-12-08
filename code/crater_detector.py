@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 
-# ============================================================================
+# ============================================================================ 
 # DATA PATHS AND LOADING SECTION
-# ============================================================================
+# ============================================================================ 
 
 # Base data directory - contains all datasets
 DATA_ROOT = Path("data")
@@ -41,28 +41,28 @@ DATASET_INFO = {
         'description': 'Small training set (50 images, ~234 MB)',
         'has_ground_truth': True,
         'purpose': 'Quick testing and parameter tuning',
-        'suggested_output': 'results\\train-sample_detections.csv'
+        'suggested_output': 'results\train-sample_detections.csv'
     },
     'train': {
         'name': 'Full Training Set',
         'description': 'Complete training data (requires extracting train.tar, ~19 GB)',
         'has_ground_truth': True,
         'purpose': 'Full model evaluation and validation',
-        'suggested_output': 'results\\train_full_detections.csv'
+        'suggested_output': 'results\train_full_detections.csv'
     },
     'test': {
         'name': 'Test Set',
         'description': 'Test data for submission (requires extracting test.tar, ~3.3 GB)',
         'has_ground_truth': False,
         'purpose': 'Generate final submission file',
-        'suggested_output': 'results\\solution.csv'
+        'suggested_output': 'results\solution.csv'
     },
     'sample-submission': {
         'name': 'Sample Submission',
         'description': 'Example submission format and reference code',
         'has_ground_truth': False,
         'purpose': 'Reference for submission format',
-        'suggested_output': 'results\\sample_solution.csv'
+        'suggested_output': 'results\sample_solution.csv'
     }
 }
 
@@ -75,7 +75,7 @@ class DatasetLoader:
     
     def __init__(self, data_root: str = "data"):
         """
-        Initialize the dataset loader.
+        Initialize the dataset loader. 
         
         Args:
             data_root: Root directory containing all datasets (default: "data")
@@ -85,7 +85,7 @@ class DatasetLoader:
     
     def _discover_datasets(self) -> Dict[str, Dict]:
         """
-        Discover available datasets in the data directory.
+        Discover available datasets in the data directory. 
         
         Returns:
             Dictionary mapping dataset names to their info and status
@@ -113,7 +113,7 @@ class DatasetLoader:
     
     def get_dataset_path(self, dataset_name: str) -> Optional[Path]:
         """
-        Get the full path for a dataset.
+        Get the full path for a dataset. 
         
         Args:
             dataset_name: Name of dataset ('train', 'test', 'train-sample', 'sample-submission')
@@ -129,7 +129,7 @@ class DatasetLoader:
     
     def validate_dataset(self, dataset_name: str) -> Tuple[bool, str]:
         """
-        Validate that a dataset exists and has proper structure.
+        Validate that a dataset exists and has proper structure. 
         
         Args:
             dataset_name: Name of dataset to validate
@@ -157,7 +157,7 @@ class DatasetLoader:
     
     def list_available_datasets(self) -> List[Dict]:
         """
-        Get list of all available datasets with their status.
+        Get list of all available datasets with their status. 
         
         Returns:
             List of dataset information dictionaries
@@ -171,14 +171,14 @@ class DatasetLoader:
                 'is_valid': info['is_valid'],
                 'has_ground_truth': info.get('has_ground_truth', False),
                 'path': str(info['path']),
-                'suggested_output': info.get('suggested_output', 'results\\detections.csv')
+                'suggested_output': info.get('suggested_output', 'results\detections.csv')
             }
             for key, info in self.available_datasets.items()
         ]
     
     def get_dataset_images(self, dataset_name: str) -> List[Path]:
         """
-        Get all image files from a dataset.
+        Get all image files from a dataset. 
         
         Args:
             dataset_name: Name of dataset
@@ -201,9 +201,9 @@ class DatasetLoader:
         return image_files
 
 
-# ============================================================================
+# ============================================================================ 
 # ALGORITHM CONFIGURATION SECTION
-# ============================================================================
+# ============================================================================ 
 
 DEFAULT_SAMPLE_FOLDER = "sample_data"
 DEFAULT_MIN_SEMI_MINOR_AXIS = 40
@@ -211,9 +211,9 @@ DEFAULT_MAX_CRATER_RATIO = 0.6
 DEFAULT_CONFIDENCE_THRESHOLD = 0.3
 
 
-# ============================================================================
+# ============================================================================ 
 # MAIN CRATER DETECTOR CLASS
-# ============================================================================
+# ============================================================================ 
 
 class CraterDetector:
     """Main crater detection class implementing ellipse fitting algorithms."""
@@ -230,17 +230,17 @@ class CraterDetector:
         self.canny_th2 = canny_th2
         self.circularity_threshold = circularity_threshold
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 1: IMAGE PREPROCESSING
-    # ========================================================================
+    # ======================================================================== 
     
     def preprocess_image(self, image: np.ndarray) -> np.ndarray:
         """
-        Preprocess the grayscale lunar image for crater detection.
+        Preprocess the grayscale lunar image for crater detection. 
         
         Steps:
         1. Gaussian blur to reduce high-frequency noise
-        2. CLAHE to enhance local contrast (especially important for shadows)
+        2. CLAHE to enhance local contrast (especially important for shadows) 
         
         Args:
             image: Input grayscale image (numpy array)
@@ -260,13 +260,13 @@ class CraterDetector:
         enhanced = clahe.apply(blurred)
         return enhanced
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 2: EDGE DETECTION
-    # ========================================================================
+    # ======================================================================== 
     
     def detect_edges(self, image: np.ndarray) -> np.ndarray:
         """
-        Detect edges using Canny edge detection algorithm.
+        Detect edges using Canny edge detection algorithm. 
         
         Challenge: Crater rims often have broken/incomplete edges due to:
         - Shadows and lighting variations
@@ -294,9 +294,9 @@ class CraterDetector:
         edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
         return edges
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 3: CONTOUR DETECTION
-    # ========================================================================
+    # ======================================================================== 
     
     def find_contours(self, edges: np.ndarray) -> List:
         """Find contours in the edge map."""
@@ -304,9 +304,9 @@ class CraterDetector:
                                         cv2.CHAIN_APPROX_SIMPLE)
         return contours
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 4: ELLIPSE FITTING
-    # ========================================================================
+    # ======================================================================== 
     
     def fit_ellipse_to_contour(self, contour: np.ndarray) -> Optional[Tuple]:
         """Fit an ellipse to a contour if it has sufficient points."""
@@ -329,14 +329,14 @@ class CraterDetector:
         except cv2.error:
             return None
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 5: CRATER FILTERING (CONTEST RULES)
-    # ========================================================================
+    # ======================================================================== 
     
     def filter_crater(self, ellipse_params: Optional[Tuple], 
                      image_shape: Tuple) -> bool:
         """
-        Apply filtering criteria per NASA challenge rules.
+        Apply filtering criteria per NASA challenge rules. 
         
         NASA Challenge Filtering Requirements:
         1. Too small craters: semi_minor < 40 pixels
@@ -345,7 +345,7 @@ class CraterDetector:
         
         These filters ensure we only detect craters that:
         - Are large enough to be reliably measured
-        - Are not so large they dominate the image
+        - Are not so large they dominate the scene
         - Are fully visible (complete ellipse within frame)
         
         Args:
@@ -387,22 +387,19 @@ class CraterDetector:
         bbox_width = 2 * np.sqrt((a * cos_angle)**2 + (b * sin_angle)**2)
         bbox_height = 2 * np.sqrt((a * sin_angle)**2 + (b * cos_angle)**2)
         
-        # Calculate bounding box edges
         left = center_x - bbox_width / 2
         right = center_x + bbox_width / 2
         top = center_y - bbox_height / 2
         bottom = center_y + bbox_height / 2
         
-        # Reject if any part extends beyond image boundaries
         if left < 0 or right >= width or top < 0 or bottom >= height:
             return False
         
-        # Passed all filters
         return True
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 6: CRATER VALIDATION & CONFIDENCE SCORING
-    # ========================================================================
+    # ======================================================================== 
     
     def validate_crater_appearance(self, image: np.ndarray, 
                                    ellipse_params: Tuple) -> float:
@@ -459,18 +456,18 @@ class CraterDetector:
         
         return confidence
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 7: CRATER CLASSIFICATION
-    # ========================================================================
+    # ======================================================================== 
     
-    def classify_crater(self, ellipse_params: Tuple, image: np.ndarray,
+    def classify_crater(self, ellipse_params: Tuple, image: np.ndarray, 
                        confidence: float = None) -> int:
         """Classify crater based on rim crispness."""
         return -1  # Placeholder: No classification
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 8: SINGLE IMAGE DETECTION PIPELINE
-    # ========================================================================
+    # ======================================================================== 
     
     def detect_craters_in_image(self, image_path: str, 
                                 verbose: bool = False) -> List[Dict]:
@@ -517,9 +514,9 @@ class CraterDetector:
         
         return detected_craters
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 9: DATA FOLDER VALIDATION
-    # ========================================================================
+    # ======================================================================== 
     
     def validate_data_folder(self, data_folder: str) -> Tuple[bool, str, List[Path]]:
         """Validate that the data folder exists and contains expected structure."""
@@ -551,9 +548,9 @@ class CraterDetector:
         
         return True, "", image_files
     
-    # ========================================================================
+    # ======================================================================== 
     # SECTION 10: BATCH DATASET PROCESSING
-    # ========================================================================
+    # ======================================================================== 
     
     def process_dataset(self, data_folder: str, output_file: str, 
                        verbose: bool = True) -> bool:
@@ -566,7 +563,7 @@ class CraterDetector:
         
         if verbose:
             print(f"Found {len(image_files)} images to process.")
-            print(f"Processing...")
+            print("Processing...")
         
         results = []
         data_path = Path(data_folder)
@@ -620,9 +617,9 @@ class CraterDetector:
             return True
 
 
-# ============================================================================
+# ============================================================================ 
 # HELPER FUNCTIONS SECTION
-# ============================================================================
+# ============================================================================ 
 
 def display_data_configuration():
     """
@@ -679,7 +676,7 @@ def display_data_configuration():
 def select_data_folder() -> Optional[str]:
     """
     Interactively prompt user to select a data folder from available options.
-    Uses DatasetLoader to discover and validate datasets.
+    Uses DatasetLoader to discover and validate datasets. 
     
     Returns:
         str: Path to the selected data folder, or None if cancelled
@@ -701,7 +698,7 @@ def select_data_folder() -> Optional[str]:
     print("           ├── test/               (for final submission)")
     print("           ├── train/              (full training set)")
     print("           └── train-sample/       (small training subset)")
-    print("\n" + "-"*70)
+    print("\n" + "-" * 70)
     
     for idx, dataset in enumerate(main_datasets, 1):
         # Determine status with validation
@@ -853,17 +850,17 @@ def select_output_file(data_folder: str = None, default_name: str = "solution.cs
     if data_folder:
         data_path = Path(data_folder)
         if 'train-sample' in str(data_path):
-            suggested_default = "results\\train-sample_detections.csv"
+            suggested_default = "results\train-sample_detections.csv"
         elif 'train' in str(data_path) and 'sample' not in str(data_path):
-            suggested_default = "results\\train_full_detections.csv"
+            suggested_default = "results\train_full_detections.csv"
         elif 'test' in str(data_path):
-            suggested_default = "results\\solution.csv"
+            suggested_default = "results\solution.csv"
     
     suggested_outputs = [
-        ("results\\train-sample_detections.csv", "For data\\train-sample"),
-        ("results\\train_full_detections.csv", "For data\\train (full set)"),
-        ("results\\solution.csv", "For data\\test (submission)"),
-        ("results\\custom_detections.csv", "Custom output name")
+        ("results\train-sample_detections.csv", "For data\train-sample"),
+        ("results\train_full_detections.csv", "For data\train (full set)"),
+        ("results\solution.csv", "For data\test (submission)"),
+        ("results\custom_detections.csv", "Custom output name")
     ]
     
     print(f"\nData folder: {data_folder if data_folder else 'Not specified'}")
@@ -904,7 +901,7 @@ def select_output_file(data_folder: str = None, default_name: str = "solution.cs
 def generate_sample_data(output_folder: str) -> bool:
     """
     Generate synthetic sample test images with crater features.
-    Useful for quick testing without downloading the full dataset.
+    Useful for quick testing without downloading the full dataset. 
     
     Args:
         output_folder: Directory where sample images will be created
@@ -983,7 +980,7 @@ def analyze_detections(file_path):
         print("No valid detections found in the file.")
         return
 
-    print("--- Descriptive Statistics for Ellipse Axes (in pixels) ---\n")
+    print("--- Descriptive Statistics for Ellipse Axes (in pixels) ---\\n")
     
     # Calculate aspect ratio
     df_valid['aspect_ratio'] = df_valid['ellipseSemimajor(px)'] / df_valid['ellipseSemiminor(px)']
@@ -1008,7 +1005,7 @@ def analyze_detections(file_path):
     
     large_craters = df_valid[df_valid['size_sum'] > max_size_threshold]
     
-    print(f"--- Potential Outliers (Ellipses larger than challenge filter) ---\n")
+    print(f"--- Potential Outliers (Ellipses larger than challenge filter) ---\\n")
     print(f"The detection script should already filter craters where (semi_major + semi_minor) >= {max_size_threshold:.1f} pixels.")
     
     if not large_craters.empty:
@@ -1023,7 +1020,7 @@ def analyze_detections(file_path):
     aspect_threshold = 10
     elongated_craters = df_valid[df_valid['aspect_ratio'] > aspect_threshold]
     
-    print(f"--- Unusually Elongated Ellipses (Aspect Ratio > {aspect_threshold}) ---\n")
+    print(f"--- Unusually Elongated Ellipses (Aspect Ratio > {aspect_threshold}) ---\\n")
     
     if not elongated_craters.empty:
         print(f"Found {len(elongated_craters)} detections that are very elongated:")
@@ -1148,17 +1145,17 @@ def score1(ts, ps):
     return ret
 
 
-# ============================================================================
+# ============================================================================ 
 # MAIN FUNCTION
-# ============================================================================
+# ============================================================================ 
 
 def main():
     """Main function to run crater detection."""
     import argparse
     
-    # ========================================================================
+    # ======================================================================== 
     # STEP 0: Automatic Data Discovery and Display
-    # ========================================================================
+    # ======================================================================== 
     
     # Display data configuration automatically when script starts
     # This shows all available datasets, their paths, and status
@@ -1203,10 +1200,9 @@ Expected data structure within the specified data_folder:
   │   │   └── ...
   │   └── longitude02/
   └── altitude02/
-        """
-    )
+        """)
     parser.add_argument('--data_folder', type=str, 
-                       help='Path to data folder containing altitude/longitude hierarchy (e.g., data\\train-sample, data\\train, data\\test)')
+                       help='Path to data folder containing altitude/longitude hierarchy (e.g., data\train-sample, data\train, data\test)')
     parser.add_argument('--output', type=str, default='solution.csv',
                        help='Output CSV file path (default: solution.csv)')
     parser.add_argument('--generate_sample', type=str, metavar='PATH',
@@ -1223,9 +1219,9 @@ Expected data structure within the specified data_folder:
     
     args = parser.parse_args()
     
-    # ========================================================================
+    # ======================================================================== 
     # STEP 1: Handle special modes (sample generation, auto-generate)
-    # ========================================================================
+    # ======================================================================== 
     
     # Handle sample data generation (useful for quick smoke tests without downloading the archive)
     if args.generate_sample:
@@ -1247,9 +1243,9 @@ Expected data structure within the specified data_folder:
                 sys.exit(1)
             print()
     
-    # ========================================================================
+    # ======================================================================== 
     # STEP 2: Interactive data folder selection if not provided via CLI
-    # ========================================================================
+    # ======================================================================== 
     
     # If no data_folder provided, offer interactive selection
     if not args.data_folder:
@@ -1287,22 +1283,22 @@ Expected data structure within the specified data_folder:
             print("  python code\\crater_detector_final.py --data_folder data\\train-sample --output results\\detections.csv --evaluate")
             sys.exit(1)
     
-    # ========================================================================
+    # ======================================================================== 
     # STEP 3: Initialize detector with specified parameters
-    # ========================================================================
+    # ======================================================================== 
     
     # Create detector instance with user-specified or default parameters
     # Canny thresholds control edge detection sensitivity
-    # Circularity threshold filters out non-circular/non-elliptical shapes
+    # Circularity thresholds filters out non-circular/non-elliptical shapes
     detector = CraterDetector(
         canny_th1=args.canny1,
         canny_th2=args.canny2,
         circularity_threshold=args.circularity
     )
     
-    # ========================================================================
+    # ======================================================================== 
     # STEP 4: Process the dataset and generate detections
-    # ========================================================================
+    # ======================================================================== 
     
     # Display processing configuration
     print("\n" + "="*70)
