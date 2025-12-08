@@ -26,9 +26,10 @@ This script facilitates the **packaging of the solution** for official submissio
 This script ensures that the submission adheres to all formatting and content requirements, making it ready for evaluation.
 
 ### 3. `run_full_workflow.py`
-This is the **orchestration script** that streamlines the entire workflow. It acts as the central entry point for:
--   **Running Crater Detection**: Executes `crater_detector_final.py` to process images and generate detection results.
--   **Scoring Detections**: If a ground truth file is provided, it triggers the integrated scoring logic within `crater_detector_final.py` to evaluate the generated detections.
--   **Creating Submission Package**: Utilizes `create_submission.py` to bundle all necessary files into the final submission ZIP archive.
+This is the **orchestration script** that streamlines the entire workflow by processing all predefined datasets automatically. It acts as the central entry point for:
+-   **Automated Dataset Processing**: Iterates through the `train-sample`, `train`, and `test` datasets (paths are hardcoded within the script).
+-   **Running Crater Detection**: Executes `crater_detector_final.py` for each dataset to process images and generate detection results (e.g., `train-sample_detections.csv`, `train_detections.csv`, `test_detections.csv`).
+-   **Scoring Detections**: If a ground truth file is available and specified internally for a dataset, it triggers the integrated scoring logic within `crater_detector_final.py` to evaluate the generated detections and saves the score to a uniquely named file (e.g., `result_train-sample.txt`).
+-   **Submission Package Creation (Optional)**: While currently set up for processing individual datasets, this script can be extended to utilize `create_submission.py` to bundle necessary files into a final submission ZIP archive for a specific dataset (e.g., the `test` set).
 
-This script simplifies the execution of the full detection, evaluation, and submission process.
+This script simplifies the execution of the full detection, evaluation, and organized output process across all major datasets.
