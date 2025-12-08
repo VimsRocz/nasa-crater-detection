@@ -694,15 +694,23 @@ def main():
         epilog="""
 Examples:
   # Run on training sample data and evaluate
-  python crater_detector.py --data_folder ../train-sample --output detections.csv --evaluate
+  python crater_detector_final.py --data_folder ../data/train-sample --output detections.csv --evaluate
+
+  # Run on full training data (if available)
+  python crater_detector_final.py --data_folder ../data/train --output train_detections.csv
 
   # Run on test data for submission
-  python crater_detector.py --data_folder ../test --output solution.csv
+  python crater_detector_final.py --data_folder ../data/test --output solution.csv
 
   # Auto-generate sample data and test
-  python crater_detector.py --auto_generate
+  python crater_detector_final.py --auto_generate
 
-Expected data structure:
+Data Folder Options (relative to project root):
+  - Small training set: ../data/train-sample
+  - Full training set:  ../data/train (requires downloading train.tar and extracting)
+  - Test set:           ../data/test (requires downloading test.tar and extracting)
+
+Expected data structure within the specified data_folder:
   data_folder/
   ├── altitude01/
   │   ├── longitude01/
@@ -713,7 +721,7 @@ Expected data structure:
         """
     )
     parser.add_argument('--data_folder', type=str, 
-                       help='Path to data folder containing images')
+                       help='Path to data folder containing images. Use one of: ../data/train-sample, ../data/train, or ../data/test.')
     parser.add_argument('--output', type=str, default='solution.csv',
                        help='Output CSV file path (default: solution.csv)')
     parser.add_argument('--generate_sample', type=str, metavar='PATH',
