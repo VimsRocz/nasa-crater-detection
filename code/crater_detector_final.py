@@ -20,7 +20,189 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 
 # ============================================================================
-# CONFIGURATION SECTION
+# DATA PATHS AND LOADING SECTION
+# ============================================================================
+
+# Base data directory - contains all datasets
+DATA_ROOT = Path("data")
+
+# Dataset paths - three main datasets available in the project
+DATASET_PATHS = {
+    'sample-submission': DATA_ROOT / "sample-submission",
+    'test': DATA_ROOT / "test",
+    'train': DATA_ROOT / "train",
+    'train-sample': DATA_ROOT / "train-sample"  # Small training subset
+}
+
+# Dataset descriptions for user guidance
+DATASET_INFO = {
+    'train-sample': {
+        'name': 'Training Sample',
+        'description': 'Small training set (50 images, ~234 MB)',
+        'has_ground_truth': True,
+        'purpose': 'Quick testing and parameter tuning',
+        'suggested_output': 'results\\train-sample_detections.csv'
+    },
+    'train': {
+        'name': 'Full Training Set',
+        'description': 'Complete training data (requires extracting train.tar, ~19 GB)',
+        'has_ground_truth': True,
+        'purpose': 'Full model evaluation and validation',
+        'suggested_output': 'results\\train_full_detections.csv'
+    },
+    'test': {
+        'name': 'Test Set',
+        'description': 'Test data for submission (requires extracting test.tar, ~3.3 GB)',
+        'has_ground_truth': False,
+        'purpose': 'Generate final submission file',
+        'suggested_output': 'results\\solution.csv'
+    },
+    'sample-submission': {
+        'name': 'Sample Submission',
+        'description': 'Example submission format and reference code',
+        'has_ground_truth': False,
+        'purpose': 'Reference for submission format',
+        'suggested_output': 'results\\sample_solution.csv'
+    }
+}
+
+
+class DatasetLoader:
+    """
+    Handles loading and validation of NASA crater detection datasets.
+    Manages paths for train, test, and sample-submission datasets.
+    """
+    
+    def __init__(self, data_root: str = "data"):
+        """
+        Initialize the dataset loader.
+        
+        Args:
+            data_root: Root directory containing all datasets (default: "data")
+        """
+        self.data_root = Path(data_root)
+        self.available_datasets = self._discover_datasets()
+    
+    def _discover_datasets(self) -> Dict[str, Dict]:
+        """
+        Discover available datasets in the data directory.
+        
+        Returns:
+            Dictionary mapping dataset names to their info and status
+        """
+        datasets = {}
+        
+        for dataset_key, dataset_path in DATASET_PATHS.items():
+            info = DATASET_INFO.get(dataset_key, {}).copy()
+            info['path'] = dataset_path
+            info['exists'] = dataset_path.exists()
+            info['key'] = dataset_key
+            
+            # Check for altitude folders (indicates extracted/valid dataset)
+            if info['exists']:
+                altitude_folders = list(dataset_path.glob('altitude*'))
+                info['is_valid'] = len(altitude_folders) > 0
+                info['altitude_count'] = len(altitude_folders)
+            else:
+                info['is_valid'] = False
+                info['altitude_count'] = 0
+            
+            datasets[dataset_key] = info
+        
+        return datasets
+    
+    def get_dataset_path(self, dataset_name: str) -> Optional[Path]:
+        """
+        Get the full path for a dataset.
+        
+        Args:
+            dataset_name: Name of dataset ('train', 'test', 'train-sample', 'sample-submission')
+        
+        Returns:
+            Path object if dataset exists, None otherwise
+        """
+        if dataset_name in self.available_datasets:
+            dataset_info = self.available_datasets[dataset_name]
+            if dataset_info['exists']:
+                return dataset_info['path']
+        return None
+    
+    def validate_dataset(self, dataset_name: str) -> Tuple[bool, str]:
+        """
+        Validate that a dataset exists and has proper structure.
+        
+        Args:
+            dataset_name: Name of dataset to validate
+        
+        Returns:
+            Tuple of (is_valid, message)
+        """
+        if dataset_name not in self.available_datasets:
+            available = ', '.join(self.available_datasets.keys())
+            return False, f"Unknown dataset '{dataset_name}'. Available: {available}"
+        
+        dataset_info = self.available_datasets[dataset_name]
+        
+        if not dataset_info['exists']:
+            return False, f"Dataset '{dataset_name}' not found at {dataset_info['path']}"
+        
+        if not dataset_info['is_valid']:
+            return False, (
+                f"Dataset '{dataset_name}' exists but has no altitude folders. \n"
+                f"Expected structure: {dataset_info['path']}/altitude*/longitude*/*.png\n"
+                f"You may need to extract the TAR archive."
+            )
+        
+        return True, f"Dataset '{dataset_name}' is valid ({dataset_info['altitude_count']} altitude folders found)"
+    
+    def list_available_datasets(self) -> List[Dict]:
+        """
+        Get list of all available datasets with their status.
+        
+        Returns:
+            List of dataset information dictionaries
+        """
+        return [
+            {
+                'key': key,
+                'name': info.get('name', key),
+                'description': info.get('description', ''),
+                'exists': info['exists'],
+                'is_valid': info['is_valid'],
+                'has_ground_truth': info.get('has_ground_truth', False),
+                'path': str(info['path']),
+                'suggested_output': info.get('suggested_output', 'results\\detections.csv')
+            }
+            for key, info in self.available_datasets.items()
+        ]
+    
+    def get_dataset_images(self, dataset_name: str) -> List[Path]:
+        """
+        Get all image files from a dataset.
+        
+        Args:
+            dataset_name: Name of dataset
+        
+        Returns:
+            List of Path objects for all PNG images (excludes masks and truth overlays)
+        """
+        dataset_path = self.get_dataset_path(dataset_name)
+        if not dataset_path:
+            return []
+        
+        image_files = []
+        for altitude_folder in sorted(dataset_path.glob('altitude*')):
+            for longitude_folder in sorted(altitude_folder.glob('longitude*')):
+                for image_file in sorted(longitude_folder.glob('*.png')):
+                    # Exclude mask and truth overlay images
+                    if '_mask' not in image_file.name and '_truth' not in image_file.name:
+                        image_files.append(image_file)
+        
+        return image_files
+
+
+# ============================================================================
+# ALGORITHM CONFIGURATION SECTION
 # ============================================================================
 
 DEFAULT_SAMPLE_FOLDER = "sample_data"
@@ -53,8 +235,27 @@ class CraterDetector:
     # ========================================================================
     
     def preprocess_image(self, image: np.ndarray) -> np.ndarray:
-        """Preprocess the grayscale lunar image for crater detection."""
+        """
+        Preprocess the grayscale lunar image for crater detection.
+        
+        Steps:
+        1. Gaussian blur to reduce high-frequency noise
+        2. CLAHE to enhance local contrast (especially important for shadows)
+        
+        Args:
+            image: Input grayscale image (numpy array)
+        
+        Returns:
+            Enhanced image ready for edge detection
+        """
+        # Apply Gaussian blur to reduce noise while preserving edges
+        # Kernel size (5,5) is a balance between noise reduction and detail preservation
         blurred = cv2.GaussianBlur(image, (5, 5), 0)
+        
+        # CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        # Enhances local contrast, critical for detecting craters in varying lighting
+        # clipLimit=2.0: prevents over-amplification of noise
+        # tileGridSize=(8,8): processes image in 8x8 regions for local enhancement
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(blurred)
         return enhanced
@@ -64,8 +265,31 @@ class CraterDetector:
     # ========================================================================
     
     def detect_edges(self, image: np.ndarray) -> np.ndarray:
-        """Detect edges using Canny edge detection."""
+        """
+        Detect edges using Canny edge detection algorithm.
+        
+        Challenge: Crater rims often have broken/incomplete edges due to:
+        - Shadows and lighting variations
+        - Surface degradation and erosion
+        - Image noise and artifacts
+        
+        Solution: Use Canny edge detection + morphological closing to connect gaps
+        
+        Args:
+            image: Preprocessed grayscale image
+        
+        Returns:
+            Binary edge map where white pixels indicate edges
+        """
+        # Canny edge detection with configurable thresholds
+        # Lower threshold (canny_th1): minimum gradient for edge consideration
+        # Upper threshold (canny_th2): strong edge confirmation
+        # Pixels between thresholds are edges only if connected to strong edges
         edges = cv2.Canny(image, self.canny_th1, self.canny_th2)
+        
+        # Morphological closing: connects nearby edge pixels
+        # Critical for handling broken crater rims
+        # Ellipse kernel better matches circular/elliptical crater shapes
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
         return edges
@@ -111,41 +335,69 @@ class CraterDetector:
     
     def filter_crater(self, ellipse_params: Optional[Tuple], 
                      image_shape: Tuple) -> bool:
-        """Apply filtering criteria per contest rules."""
+        """
+        Apply filtering criteria per NASA challenge rules.
+        
+        NASA Challenge Filtering Requirements:
+        1. Too small craters: semi_minor < 40 pixels
+        2. Too large craters: (width + height) >= 0.6 * min(image_width, image_height)
+        3. Partially visible: any part of bounding box extends beyond image boundaries
+        
+        These filters ensure we only detect craters that:
+        - Are large enough to be reliably measured
+        - Are not so large they dominate the image
+        - Are fully visible (complete ellipse within frame)
+        
+        Args:
+            ellipse_params: Tuple of (center_x, center_y, semi_major, semi_minor, rotation)
+            image_shape: Shape of the image (height, width)
+        
+        Returns:
+            bool: True if crater passes all filters, False if rejected
+        """
         if ellipse_params is None:
             return False
         
         center_x, center_y, semi_major, semi_minor, rotation = ellipse_params
         height, width = image_shape[:2]
         
-        # Filter 1: Too small craters
+        # FILTER 1: Reject craters that are too small to measure accurately
+        # Challenge requirement: minimum semi-minor axis = 40 pixels
         if semi_minor < self.min_semi_minor_axis:
             return False
         
-        # Filter 2: Too large craters
+        # FILTER 2: Reject craters that are too large relative to image size
+        # Rationale: Very large craters may not fit entirely, or dominate the scene
+        # S = minimum image dimension (handles non-square images)
         S = min(width, height)
-        w = semi_major * 2
-        h = semi_minor * 2
+        w = semi_major * 2  # Full width of ellipse
+        h = semi_minor * 2  # Full height of ellipse
+        # Challenge rule: (width + height) must be < 60% of smallest dimension
         if (w + h) >= (self.max_crater_ratio * S):
             return False
         
-        # Filter 3: Not fully visible
+        # FILTER 3: Reject partially visible craters (must be fully in frame)
+        # Calculate axis-aligned bounding box considering rotation
         cos_angle = np.cos(np.radians(rotation))
         sin_angle = np.sin(np.radians(rotation))
         
         a = semi_major
         b = semi_minor
+        # Bounding box dimensions accounting for rotation
         bbox_width = 2 * np.sqrt((a * cos_angle)**2 + (b * sin_angle)**2)
         bbox_height = 2 * np.sqrt((a * sin_angle)**2 + (b * cos_angle)**2)
         
+        # Calculate bounding box edges
         left = center_x - bbox_width / 2
         right = center_x + bbox_width / 2
         top = center_y - bbox_height / 2
         bottom = center_y + bbox_height / 2
         
+        # Reject if any part extends beyond image boundaries
         if left < 0 or right >= width or top < 0 or bottom >= height:
             return False
         
+        # Passed all filters
         return True
     
     # ========================================================================
@@ -372,6 +624,143 @@ class CraterDetector:
 # HELPER FUNCTIONS SECTION
 # ============================================================================
 
+def display_data_configuration():
+    """
+    Automatically discover and display all data paths and results configuration.
+    Shows dataset availability and paths at script startup.
+    """
+    print("\n" + "="*70)
+    print("DATA CONFIGURATION - AUTOMATIC DISCOVERY")
+    print("="*70)
+    
+    # Initialize dataset loader
+    loader = DatasetLoader()
+    
+    print(f"\n📁 DATA ROOT: {DATA_ROOT.absolute()}")
+    print("\n📂 AVAILABLE DATASETS:")
+    print("-" * 70)
+    
+    for dataset_key in ['train-sample', 'train', 'test', 'sample-submission']:
+        if dataset_key in loader.available_datasets:
+            info = loader.available_datasets[dataset_key]
+            status_icon = "✓" if info['exists'] and info['is_valid'] else "✗"
+            
+            print(f"\n  {status_icon} {info.get('name', dataset_key).upper()}")
+            print(f"     Path: {info['path']}")
+            
+            if info['exists'] and info['is_valid']:
+                print(f"     Status: Ready ({info['altitude_count']} altitude folders)")
+                image_count = len(loader.get_dataset_images(dataset_key))
+                print(f"     Images: {image_count} files")
+                if info.get('has_ground_truth'):
+                    print(f"     Ground Truth: Available (use --evaluate flag)")
+            elif info['exists'] and not info['is_valid']:
+                print(f"     Status: ⚠ Needs extraction (folder exists but no altitude/* structure)")
+            else:
+                print(f"     Status: Not found (may need to extract TAR archive)")
+            
+            print(f"     Suggested Output: {info.get('suggested_output', 'N/A')}")
+    
+    print("\n" + "-" * 70)
+    print("\n📊 RESULTS OUTPUT DIRECTORY:")
+    results_path = Path("results")
+    if results_path.exists():
+        print(f"     Path: {results_path.absolute()}")
+        csv_files = list(results_path.glob('*.csv'))
+        print(f"     Existing results: {len(csv_files)} CSV files")
+    else:
+        print(f"     Path: {results_path.absolute()} (will be created)")
+    
+    print("\n" + "="*70)
+    return loader
+
+
+def select_data_folder() -> Optional[str]:
+    """
+    Interactively prompt user to select a data folder from available options.
+    Uses DatasetLoader to discover and validate datasets.
+    
+    Returns:
+        str: Path to the selected data folder, or None if cancelled
+    """
+    print("\n" + "="*70)
+    print("DATA FOLDER SELECTION")
+    print("="*70)
+    
+    # Initialize dataset loader to discover available datasets
+    loader = DatasetLoader()
+    datasets = loader.list_available_datasets()
+    
+    # Filter to show main datasets (train-sample, train, test)
+    main_datasets = [d for d in datasets if d['key'] in ['train-sample', 'train', 'test']]
+    
+    print("\nAvailable datasets in 'data/' folder:")
+    print("\nStructure: data/")
+    print("           ├── sample-submission/  (reference format)")
+    print("           ├── test/               (for final submission)")
+    print("           ├── train/              (full training set)")
+    print("           └── train-sample/       (small training subset)")
+    print("\n" + "-"*70)
+    
+    for idx, dataset in enumerate(main_datasets, 1):
+        # Determine status with validation
+        if dataset['exists'] and dataset['is_valid']:
+            status = "✓ Ready"
+            status_color = ""
+        elif dataset['exists'] and not dataset['is_valid']:
+            status = "⚠ Needs extraction"
+            status_color = ""
+        else:
+            status = "✗ Not found"
+            status_color = ""
+        
+        print(f"  {idx}. {dataset['key']:<20} - {dataset['description']}")
+        print(f"     Path: {dataset['path']}")
+        print(f"     Status: {status}")
+        print(f"     Purpose: {DATASET_INFO[dataset['key']]['purpose']}")
+        if dataset['has_ground_truth']:
+            print(f"     Ground Truth: Available (use --evaluate flag)")
+        print()
+    
+    print("  0. Cancel / Enter custom path")
+    print("="*70)
+    
+    while True:
+        try:
+            choice = input(f"\nSelect dataset (0-{len(main_datasets)}): ").strip()
+            
+            if choice == '0':
+                manual_path = input("Enter data folder path (or press Enter to cancel): ").strip()
+                if not manual_path:
+                    return None
+                return manual_path
+            
+            choice_idx = int(choice)
+            if 1 <= choice_idx <= len(main_datasets):
+                selected = main_datasets[choice_idx - 1]
+                selected_path = selected['path']
+                
+                # Validate the selected dataset
+                is_valid, message = loader.validate_dataset(selected['key'])
+                
+                if not is_valid:
+                    print(f"\n⚠ Warning: {message}")
+                    retry = input("Use this path anyway? (y/n): ").strip().lower()
+                    if retry != 'y':
+                        continue
+                else:
+                    print(f"\n✓ {message}")
+                
+                return selected_path
+            else:
+                print(f"Invalid option. Please select 0-{len(main_datasets)}.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+        except KeyboardInterrupt:
+            print("\n\nSelection cancelled.")
+            return None
+
+
 def load_ground_truth(data_folder: str) -> Optional[pd.DataFrame]:
     """Load ground truth from truth folders in the dataset."""
     data_path = Path(data_folder)
@@ -442,8 +831,86 @@ def compare_with_ground_truth(detections_file: str,
     return stats
 
 
+def select_output_file(data_folder: str = None, default_name: str = "solution.csv") -> str:
+    """
+    Prompt user to specify output CSV file name with path.
+    Suggests appropriate filenames based on the selected dataset.
+    
+    Args:
+        data_folder: Path to the data folder being processed (for smart suggestions)
+        default_name: Default filename if user presses Enter
+    
+    Returns:
+        str: Path to output CSV file
+    """
+    print("\n" + "="*70)
+    print("OUTPUT FILE SELECTION")
+    print("="*70)
+    
+    # Smart suggestion based on data folder
+    suggested_default = default_name
+    if data_folder:
+        data_path = Path(data_folder)
+        if 'train-sample' in str(data_path):
+            suggested_default = "results\\train-sample_detections.csv"
+        elif 'train' in str(data_path) and 'sample' not in str(data_path):
+            suggested_default = "results\\train_full_detections.csv"
+        elif 'test' in str(data_path):
+            suggested_default = "results\\solution.csv"
+    
+    suggested_outputs = [
+        ("results\\train-sample_detections.csv", "For data\\train-sample"),
+        ("results\\train_full_detections.csv", "For data\\train (full set)"),
+        ("results\\solution.csv", "For data\\test (submission)"),
+        ("results\\custom_detections.csv", "Custom output name")
+    ]
+    
+    print(f"\nData folder: {data_folder if data_folder else 'Not specified'}")
+    print(f"Recommended: {suggested_default}\n")
+    
+    print("\nSuggested output files:")
+    for idx, (filepath, description) in enumerate(suggested_outputs, 1):
+        print(f"  {idx}. {filepath:<45} - {description}")
+    
+    print(f"\n  0. Use default: {default_name}")
+    print("="*70)
+    
+    while True:
+        try:
+            choice = input(f"\nSelect option (0-{len(suggested_outputs)}) or enter custom path: ").strip()
+            
+            if choice == '0' or choice == '':
+                return default_name
+            
+            # Try to parse as integer selection
+            try:
+                choice_idx = int(choice)
+                if 1 <= choice_idx <= len(suggested_outputs):
+                    return suggested_outputs[choice_idx - 1][0]
+                else:
+                    print(f"Invalid option. Please select 0-{len(suggested_outputs)}.")
+            except ValueError:
+                # User entered a custom path
+                if choice.endswith('.csv'):
+                    return choice
+                else:
+                    print("Output file must end with .csv")
+        except KeyboardInterrupt:
+            print(f"\n\nUsing default: {default_name}")
+            return default_name
+
+
 def generate_sample_data(output_folder: str) -> bool:
-    """Generate sample test images with synthetic crater features."""
+    """
+    Generate synthetic sample test images with crater features.
+    Useful for quick testing without downloading the full dataset.
+    
+    Args:
+        output_folder: Directory where sample images will be created
+    
+    Returns:
+        bool: True if generation successful, False otherwise
+    """
     output_path = Path(output_folder)
     
     try:
@@ -688,27 +1155,44 @@ def main():
     """Main function to run crater detection."""
     import argparse
     
+    # ========================================================================
+    # STEP 0: Automatic Data Discovery and Display
+    # ========================================================================
+    
+    # Display data configuration automatically when script starts
+    # This shows all available datasets, their paths, and status
+    print("\n🌙 NASA LUNAR CRATER DETECTION CHALLENGE")
+    print("   Computer Vision Solution by VimsRocz\n")
+    
+    # Automatically discover and display all data paths
+    dataset_loader = display_data_configuration()
+    
+    # Build the CLI so users can point the detector at any structured dataset folder.
+    # The supplied location must follow the altitude/longitude/png hierarchy used by the challenge.
     parser = argparse.ArgumentParser(
         description='NASA Lunar Crater Detection Challenge Solution',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
+Examples (run from repo root: C:\\Users\\vimsr\\Desktop\\nasa-crater-detection):
   # Run on training sample data and evaluate
-  python crater_detector_final.py --data_folder ../data/train-sample --output detections.csv --evaluate
+  python code\\crater_detector_final.py --data_folder data\\train-sample --output results\\detections.csv --evaluate
 
   # Run on full training data (if available)
-  python crater_detector_final.py --data_folder ../data/train --output train_detections.csv
+  python code\\crater_detector_final.py --data_folder data\\train --output results\\train_detections.csv --evaluate
 
   # Run on test data for submission
-  python crater_detector_final.py --data_folder ../data/test --output solution.csv
+  python code\\crater_detector_final.py --data_folder data\\test --output results\\solution.csv
 
   # Auto-generate sample data and test
-  python crater_detector_final.py --auto_generate
+  python code\\crater_detector_final.py --auto_generate
 
 Data Folder Options (relative to project root):
-  - Small training set: ../data/train-sample
-  - Full training set:  ../data/train (requires downloading train.tar and extracting)
-  - Test set:           ../data/test (requires downloading test.tar and extracting)
+  - Small training set: data\\train-sample
+  - Full training set:  data\\train (requires extracting train.tar)
+  - Test set:           data\\test (requires extracting test.tar)
+
+IMPORTANT: The data_folder must contain altitude*/longitude*/*.png hierarchy.
+           Do NOT use 'data' or 'Data' directly - use data\\train-sample, data\\train, or data\\test
 
 Expected data structure within the specified data_folder:
   data_folder/
@@ -721,7 +1205,7 @@ Expected data structure within the specified data_folder:
         """
     )
     parser.add_argument('--data_folder', type=str, 
-                       help='Path to data folder containing images. Use one of: ../data/train-sample, ../data/train, or ../data/test.')
+                       help='Path to data folder containing altitude/longitude hierarchy (e.g., data\\train-sample, data\\train, data\\test)')
     parser.add_argument('--output', type=str, default='solution.csv',
                        help='Output CSV file path (default: solution.csv)')
     parser.add_argument('--generate_sample', type=str, metavar='PATH',
@@ -738,13 +1222,17 @@ Expected data structure within the specified data_folder:
     
     args = parser.parse_args()
     
-    # Handle sample data generation
+    # ========================================================================
+    # STEP 1: Handle special modes (sample generation, auto-generate)
+    # ========================================================================
+    
+    # Handle sample data generation (useful for quick smoke tests without downloading the archive)
     if args.generate_sample:
         print("Generating sample test data...")
         success = generate_sample_data(args.generate_sample)
         sys.exit(0 if success else 1)
     
-    # Handle auto_generate mode
+    # Handle auto_generate mode - creates synthetic data for testing
     if args.auto_generate:
         if not args.data_folder:
             args.data_folder = DEFAULT_SAMPLE_FOLDER
@@ -758,25 +1246,75 @@ Expected data structure within the specified data_folder:
                 sys.exit(1)
             print()
     
-    # Validate data_folder is provided
-    if not args.data_folder:
-        parser.print_help()
-        print("\n" + "="*70)
-        print("ERROR: No data folder specified!")
-        print("="*70)
-        print("\nQuick start:")
-        print("  python crater_detector.py --data_folder ../train-sample --evaluate")
-        sys.exit(1)
+    # ========================================================================
+    # STEP 2: Interactive data folder selection if not provided via CLI
+    # ========================================================================
     
-    # Create detector
+    # If no data_folder provided, offer interactive selection
+    if not args.data_folder:
+        # Check if running in interactive mode (not piped/redirected)
+        if sys.stdin.isatty():
+            print("\n" + "="*70)
+            print("QUICK START COMMANDS")
+            print("="*70)
+            
+            # Show ready-to-use commands based on available datasets
+            available = dataset_loader.list_available_datasets()
+            
+            print("\nBased on your available datasets, try:")
+            print()
+            
+            for dataset in available:
+                if dataset['key'] in ['train-sample', 'train', 'test'] and dataset['is_valid']:
+                    cmd = f"python code\\crater_detector_final.py --data_folder {dataset['path']} --output {dataset['suggested_output']}"
+                    if dataset['has_ground_truth']:
+                        cmd += " --evaluate"
+                    print(f"  # {dataset['name']}")
+                    print(f"  {cmd}")
+                    print()
+            
+            print("="*70)
+            print("\n⚠ No data folder specified. Please run one of the commands above.")
+            sys.exit(1)
+        else:
+            # Non-interactive mode - show help and exit
+            parser.print_help()
+            print("\n" + "="*70)
+            print("ERROR: No data folder specified!")
+            print("="*70)
+            print("\nQuick start (from repo root):")
+            print("  python code\\crater_detector_final.py --data_folder data\\train-sample --output results\\detections.csv --evaluate")
+            sys.exit(1)
+    
+    # ========================================================================
+    # STEP 3: Initialize detector with specified parameters
+    # ========================================================================
+    
+    # Create detector instance with user-specified or default parameters
+    # Canny thresholds control edge detection sensitivity
+    # Circularity threshold filters out non-circular/non-elliptical shapes
     detector = CraterDetector(
         canny_th1=args.canny1,
         canny_th2=args.canny2,
         circularity_threshold=args.circularity
     )
     
-    # Process dataset
-    print(f"Starting crater detection on: {args.data_folder}")
+    # ========================================================================
+    # STEP 4: Process the dataset and generate detections
+    # ========================================================================
+    
+    # Display processing configuration
+    print("\n" + "="*70)
+    print("CRATER DETECTION CONFIGURATION")
+    print("="*70)
+    print(f"  Data Folder:      {args.data_folder}")
+    print(f"  Output File:      {args.output}")
+    print(f"  Canny Threshold:  {args.canny1}, {args.canny2}")
+    print(f"  Circularity:      {args.circularity}")
+    print(f"  Evaluation Mode:  {'Enabled' if args.evaluate else 'Disabled'}")
+    print("="*70)
+    
+    print(f"\nStarting crater detection on: {args.data_folder}")
     print("="*70)
     success = detector.process_dataset(args.data_folder, args.output, 
                                        verbose=args.verbose)
@@ -785,7 +1323,7 @@ Expected data structure within the specified data_folder:
         print("\nDetection failed. Please check the error messages above.")
         sys.exit(1)
     
-    # Evaluate against ground truth if requested
+    # Evaluate against ground truth if training data is supplied; requires truth folders to exist
     if args.evaluate:
         print("\n" + "="*70)
         print("EVALUATION MODE")
