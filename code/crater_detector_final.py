@@ -39,12 +39,14 @@ class CraterDetector:
     def __init__(self, min_semi_minor_axis=DEFAULT_MIN_SEMI_MINOR_AXIS,
                  max_crater_ratio=DEFAULT_MAX_CRATER_RATIO,
                  confidence_threshold=DEFAULT_CONFIDENCE_THRESHOLD,
-                 canny_th1=50, canny_th2=150):
+                 canny_th1=50, canny_th2=150,
+                 circularity_threshold=0.6):
         self.min_semi_minor_axis = min_semi_minor_axis
         self.max_crater_ratio = max_crater_ratio
         self.confidence_threshold = confidence_threshold
         self.canny_th1 = canny_th1
         self.canny_th2 = canny_th2
+        self.circularity_threshold = circularity_threshold
     
     # ========================================================================
     # SECTION 1: IMAGE PREPROCESSING
@@ -200,7 +202,7 @@ class CraterDetector:
             confidence += 0.4
         if edge_strength > 0.1:
             confidence += 0.3
-        if circularity > 0.6:
+        if circularity > self.circularity_threshold:
             confidence += 0.3
         
         return confidence
@@ -494,6 +496,190 @@ def generate_sample_data(output_folder: str) -> bool:
         return False
 
 
+def analyze_detections(file_path):
+    """
+    Analyzes the crater detection results for potential issues.
+    """
+    print(f"Analyzing detection results from: {file_path}\n")
+    
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: The file {file_path} was not found.")
+        return
+
+    # Filter out placeholder rows for images with no detections
+    df_valid = df[df['ellipseCenterX(px)'] != -1].copy()
+
+    if df_valid.empty:
+        print("No valid detections found in the file.")
+        return
+
+    print("--- Descriptive Statistics for Ellipse Axes (in pixels) ---\n")
+    
+    # Calculate aspect ratio
+    df_valid['aspect_ratio'] = df_valid['ellipseSemimajor(px)'] / df_valid['ellipseSemiminor(px)']
+    
+    stats = df_valid[['ellipseSemimajor(px)', 'ellipseSemiminor(px)', 'aspect_ratio']].describe()
+    print(stats)
+    print("\n" + "="*50 + "\n")
+
+    # --- Outlier Detection ---
+    # According to the challenge rules, craters are filtered if:
+    # (width + height) >= (0.6 * S), where S is min(image_width, image_height)
+    # The images are 2048x2048, so S = 2048.
+    # Max (w+h) = 0.6 * 2048 = 1228.8
+    # w = 2 * semi_major, h = 2 * semi_minor
+    # 2 * (semi_major + semi_minor) >= 1228.8
+    # semi_major + semi_minor >= 614.4
+    
+    image_dim = 2048
+    max_size_threshold = 0.6 * image_dim / 2 
+    
+    df_valid['size_sum'] = df_valid['ellipseSemimajor(px)'] + df_valid['ellipseSemiminor(px)']
+    
+    large_craters = df_valid[df_valid['size_sum'] > max_size_threshold]
+    
+    print(f"--- Potential Outliers (Ellipses larger than challenge filter) ---\n")
+    print(f"The detection script should already filter craters where (semi_major + semi_minor) >= {max_size_threshold:.1f} pixels.")
+    
+    if not large_craters.empty:
+        print(f"Found {len(large_craters)} detections that might be too large:")
+        print(large_craters[['inputImage', 'ellipseSemimajor(px)', 'ellipseSemiminor(px)', 'size_sum']].to_string())
+    else:
+        print("No detections appear to violate the maximum size filter.")
+        
+    print("\n" + "="*50 + "\n")
+    
+    # Check for unusually high aspect ratios (very elongated ellipses)
+    aspect_threshold = 10
+    elongated_craters = df_valid[df_valid['aspect_ratio'] > aspect_threshold]
+    
+    print(f"--- Unusually Elongated Ellipses (Aspect Ratio > {aspect_threshold}) ---\n")
+    
+    if not elongated_craters.empty:
+        print(f"Found {len(elongated_craters)} detections that are very elongated:")
+        print(elongated_craters[['inputImage', 'ellipseSemimajor(px)', 'ellipseSemiminor(px)', 'aspect_ratio']].to_string())
+    else:
+        print("No unusually elongated ellipses found.")
+
+
+# Scorer functions and constants
+import os
+import math
+
+outDir = ''
+
+XI_2_THRESH = 13.277
+NN_PIX_ERR_RATIO = 0.07
+    
+def calcYmat(a, b, phi):
+    unit_1 = np.array([[math.cos(phi), -math.sin(phi)], [math.sin(phi), math.cos(phi)]])
+    unit_2 = np.array([[1 / (a ** 2), 0], [0, 1 / (b ** 2)]])
+    unit_3 = np.array([[math.cos(phi), math.sin(phi)], [-math.sin(phi), math.cos(phi)]])
+    return unit_1 @ unit_2 @ unit_3
+
+def calc_dGA(Yi, Yj, yi, yj):
+    multiplicand = 4 * np.sqrt(np.linalg.det(Yi) * np.linalg.det(Yj)) / np.linalg.det(Yi + Yj)
+    exponent = (-0.5 * (yi - yj).T @ Yi @ np.linalg.inv(Yi + Yj) @ Yj @ (yi - yj))
+    e = exponent[0, 0]
+    cos = multiplicand * np.exp(e)
+    cos = min(1, cos)
+    return np.arccos(cos)
+
+def dGA(crater_A, crater_B):
+    
+    A_a = crater_A['ellipseSemimajor(px)']
+    A_b = crater_A['ellipseSemiminor(px)']
+    A_xc = crater_A['ellipseCenterX(px)']
+    A_yc = crater_A['ellipseCenterY(px)']
+    A_phi = crater_A['ellipseRotation(deg)'] / 180 * math.pi
+
+    B_a = crater_B['ellipseSemimajor(px)']
+    B_b = crater_B['ellipseSemiminor(px)']
+    B_xc = crater_B['ellipseCenterX(px)']
+    B_yc = crater_B['ellipseCenterY(px)']
+    B_phi = crater_B['ellipseRotation(deg)'] / 180 * math.pi
+
+    A_Y = calcYmat(A_a, A_b, A_phi)
+    B_Y = calcYmat(B_a, B_b, B_phi)
+    
+    A_y = np.array([[A_xc], [A_yc]])
+    B_y = np.array([[B_xc], [B_yc]])
+
+    dGA = calc_dGA(A_Y, B_Y, A_y, B_y)
+
+    ab_min = np.min([A_a, A_b])
+    comparison_sig = NN_PIX_ERR_RATIO * ab_min
+    ref_sig = 0.85 / np.sqrt(A_a * A_b) * comparison_sig
+    xi_2 = dGA * dGA / (ref_sig * ref_sig)
+    
+    return dGA, xi_2
+
+
+def writeScore(s, out_dir):
+    # This function's outDir is globally defined in the scorer.py context.
+    # We will need to decide if we want to retain this global behavior or
+    # pass out_dir as an argument. For now, assuming global.
+    path = os.path.join(out_dir, 'result.txt')
+    os.makedirs(os.path.dirname(path), exist_ok=True) # Ensure directory exists
+    out = open(path, 'w')
+    out.write(str(s))
+    out.close()
+
+def score1(ts, ps):
+    if len(ps) == 0:
+        return 0.0
+    t_empty = False
+    p_empty = False
+    if len(ts) == 1 and ts[0].get('ellipseSemimajor(px)') == -1:
+        t_empty = True
+    if len(ps) == 1 and ps[0].get('ellipseSemimajor(px)') == -1:
+        p_empty = True
+    if t_empty and p_empty:
+        return 1.0
+    if t_empty != p_empty:
+        return 0.0
+    
+    dgas = []
+
+    for t in ts:
+        # find best matching prediction
+        best_p = None
+        best_dGA = math.pi / 2
+        best_xi_2 = float('inf')
+
+        for p in ps:
+            if p['matched']:
+                continue
+            # short-circuit checks
+            rA = min(t['ellipseSemimajor(px)'], t['ellipseSemiminor(px)'])
+            rB = min(p['ellipseSemimajor(px)'], p['ellipseSemiminor(px)'])
+            if rA > 1.5 * rB or rB > 1.5 * rA:
+                continue
+            r = min(rA, rB )
+            if abs(t['ellipseCenterX(px)'] - p['ellipseCenterX(px)']) > r:
+                continue
+            if abs(t['ellipseCenterY(px)'] - p['ellipseCenterY(px)']) > r:
+                continue
+            d, xi_2 = dGA(t, p)
+            if d < best_dGA:
+                best_dGA = d
+                best_p = p
+                best_xi_2 = xi_2
+        if best_xi_2 < XI_2_THRESH: # matched
+            t['matched'] = True
+            best_p['matched'] = True
+            dgas.append(1 - best_dGA / math.pi)
+
+    if len(dgas) == 0:
+        return 0.0        
+    avg_dga = sum(dgas) / len(ps)
+    tp_count = len(dgas)
+    ret = avg_dga * min(1.0, tp_count / min(10, len(ts)))
+    return ret
+
+
 # ============================================================================
 # MAIN FUNCTION
 # ============================================================================
@@ -540,6 +726,7 @@ Expected data structure:
                        help='Print detailed progress information')
     parser.add_argument('--canny1', type=int, default=50, help='First threshold for the Canny edge detector.')
     parser.add_argument('--canny2', type=int, default=150, help='Second threshold for the Canny edge detector.')
+    parser.add_argument('--circularity', type=float, default=0.6, help='Circularity threshold for crater validation.')
     
     args = parser.parse_args()
     
@@ -576,7 +763,8 @@ Expected data structure:
     # Create detector
     detector = CraterDetector(
         canny_th1=args.canny1,
-        canny_th2=args.canny2
+        canny_th2=args.canny2,
+        circularity_threshold=args.circularity
     )
     
     # Process dataset
@@ -595,11 +783,11 @@ Expected data structure:
         print("EVALUATION MODE")
         print("="*70)
         
-        ground_truth = load_ground_truth(args.data_folder)
+        ground_truth_df = load_ground_truth(args.data_folder)
         
-        if ground_truth is not None:
+        if ground_truth_df is not None:
             print(f"✓ Loaded ground truth from truth folders")
-            stats = compare_with_ground_truth(args.output, ground_truth)
+            stats = compare_with_ground_truth(args.output, ground_truth_df)
             
             print("\nComparison Statistics:")
             print(f"  Ground Truth Craters: {stats['ground_truth_craters']}")
@@ -608,11 +796,71 @@ Expected data structure:
             print(f"  Detected Images: {stats['detected_images']}")
             print(f"  Common Images: {stats['common_images']}")
             print(f"  Missing Images: {stats['missing_images']}")
+
+            print("\nNOTE: Performing additional analysis:")
+            analyze_detections(args.output)
             
-            print("\nNOTE: For precise scoring, use the official scorer.py:")
-            print(f"  python ../scorer.py --pred {args.output} --truth <ground_truth.csv>")
+            print("\n" + "="*70)
+            print("SCORING RESULTS")
+            print("="*70)
+
+            try:
+                print('Reading truth data for scoring...')
+                # Need to use the loaded ground_truth_df, not re-read from file
+                truth_for_scoring = (
+                    ground_truth_df.set_index('inputImage').groupby(level='inputImage')
+                    .apply(lambda g: g.to_dict(orient='records'))
+                    .to_dict()
+                )
+                print('Reading detections for scoring...')
+                detections_for_scoring_df = pd.read_csv(args.output)
+                detections_for_scoring = (
+                    detections_for_scoring_df.set_index('inputImage').groupby(level='inputImage')
+                    .apply(lambda g: g.to_dict(orient='records'))
+                    .to_dict()
+                )
+
+                image_ids = list(truth_for_scoring.keys())
+                total_score = 0
+                for img_id in image_ids:
+                    truth_craters = truth_for_scoring[img_id]
+                    # Ensure detections exist for this image
+                    if img_id not in detections_for_scoring:
+                        detection_craters = [] # No detections for this image
+                    else:
+                        detection_craters = detections_for_scoring[img_id]
+                    
+                    # Reset 'matched' status for each image's detections and truth
+                    for tc in truth_craters:
+                        tc['matched'] = False
+                    for dc in detection_craters:
+                        dc['matched'] = False
+
+                    try:
+                        score_for_image = score1(truth_craters, detection_craters)
+                    except Exception as e:
+                        print(f'Error scoring image {img_id}: {str(e)}')
+                        score_for_image = 0 # Assign 0 if scoring fails for an image
+                    total_score += score_for_image
+
+                # Calculate average score
+                if len(image_ids) > 0:
+                    average_score = total_score / len(image_ids)
+                    final_score = 100 * average_score
+                else:
+                    final_score = 0.0
+
+                print(f'Overall Score: {final_score}')
+                # Assuming 'results' folder for score output if args.out_dir is not provided
+                score_output_dir = Path("results/scorer-out") # Default path
+                score_output_dir.mkdir(parents=True, exist_ok=True)
+                writeScore(final_score, str(score_output_dir)) # Pass path to writeScore
+
+            except Exception as e:
+                print(f'Error during scoring process: {str(e)}')
+            
         else:
-            print("⚠ No ground truth found in truth/ folders")
+            print("⚠ No ground truth found in truth/ folders for scoring")
             print("  This appears to be test data (no truth/ folders)")
     
     print("\n" + "="*70)

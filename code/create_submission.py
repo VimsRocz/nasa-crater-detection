@@ -58,7 +58,7 @@ echo "Output: $OUTPUT_FOLDER"
 mkdir -p "$OUTPUT_FOLDER"
 
 # Run detection
-python3 crater_detector.py --data_folder "$DATA_FOLDER" --output "$OUTPUT_FOLDER/solution.csv"
+python3 crater_detector_final.py --data_folder "$DATA_FOLDER" --output "$OUTPUT_FOLDER/solution.csv"
 
 echo "Detection complete!"
 """
@@ -102,7 +102,7 @@ This solution uses a computer vision approach based on:
 
 ### Direct Python Usage
 ```bash
-python crater_detector.py --data_folder /path/to/data --output solution.csv
+python crater_detector_final.py --data_folder /path/to/data --output solution.csv
 ```
 
 ## Performance
@@ -129,7 +129,7 @@ def create_submission_package(base_dir: str, output_zip: str = "submission.zip")
     
     # Check required files
     solution_csv = base_path / "solution.csv"
-    crater_detector = base_path / "code" / "crater_detector.py"
+    crater_detector = base_path / "code" / "crater_detector_final.py"
     
     if not solution_csv.exists():
         print(f"Error: solution.csv not found at {solution_csv}")
@@ -158,7 +158,7 @@ def create_submission_package(base_dir: str, output_zip: str = "submission.zip")
     
     # Copy crater_detector.py
     print("✓ Copying crater_detector.py")
-    shutil.copy2(crater_detector, code_dir / "crater_detector.py")
+    shutil.copy2(crater_detector, code_dir / "crater_detector_final.py")
     
     # Create train.sh
     print("✓ Creating train.sh")
@@ -203,7 +203,7 @@ def create_submission_package(base_dir: str, output_zip: str = "submission.zip")
     print(f"📊 Size: {size_mb:.2f} MB")
     print(f"📁 Contents:")
     print(f"   /solution/solution.csv")
-    print(f"   /code/crater_detector.py")
+    print(f"   /code/crater_detector_final.py")
     print(f"   /code/train.sh")
     print(f"   /code/test.sh")
     print(f"   /code/README.md")
