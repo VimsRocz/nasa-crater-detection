@@ -850,17 +850,17 @@ def select_output_file(data_folder: str = None, default_name: str = "solution.cs
     if data_folder:
         data_path = Path(data_folder)
         if 'train-sample' in str(data_path):
-            suggested_default = "results\train-sample_detections.csv"
+            suggested_default = str(Path("results") / "train-sample_detections.csv")
         elif 'train' in str(data_path) and 'sample' not in str(data_path):
-            suggested_default = "results\train_full_detections.csv"
+            suggested_default = str(Path("results") / "train_full_detections.csv")
         elif 'test' in str(data_path):
-            suggested_default = "results\solution.csv"
+            suggested_default = str(Path("results") / "solution.csv")
     
     suggested_outputs = [
-        ("results\train-sample_detections.csv", "For data\train-sample"),
-        ("results\train_full_detections.csv", "For data\train (full set)"),
-        ("results\solution.csv", "For data\test (submission)"),
-        ("results\custom_detections.csv", "Custom output name")
+        (str(Path("results") / "train-sample_detections.csv"), "For data/train-sample"),
+        (str(Path("results") / "train_full_detections.csv"), "For data/train (full set)"),
+        (str(Path("results") / "solution.csv"), "For data/test (submission)"),
+        (str(Path("results") / "custom_detections.csv"), "Custom output name")
     ]
     
     print(f"\nData folder: {data_folder if data_folder else 'Not specified'}")
@@ -1171,18 +1171,18 @@ def main():
         description='NASA Lunar Crater Detection Challenge Solution',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples (run from repo root: C:\\Users\\vimsr\\Desktop\\nasa-crater-detection):
+Examples (run from repo root: /path/to/nasa-crater-detection):
   # Run on training sample data and evaluate
-  python code/crater_detector_final.py --data_folder data\train-sample --output results/detections.csv --evaluate
+  python code/crater_detector_final.py --data_folder data/train-sample --output results/detections.csv --evaluate
 
   # Run on full training data (if available)
-  python code/crater_detector_final.py --data_folder data\train --output results/train_detections.csv --evaluate
+  python code/crater_detector_final.py --data_folder data/train --output results/train_detections.csv --evaluate
 
   # Run on test data for submission
-  python code/crater_detector_final.py --data_folder data\test --output results/solution.csv
+  python code/crater_detector_final.py --data_folder data/test --output results/solution.csv
 
   # Auto-generate sample data and test
-  python code\\crater_detector_final.py --auto_generate
+  python code/crater_detector_final.py --auto_generate
 
 Data Folder Options (relative to project root):
   - Small training set: data/train-sample
@@ -1190,7 +1190,7 @@ Data Folder Options (relative to project root):
   - Test set:           data/test (requires extracting test.tar)
 
 IMPORTANT: The data_folder must contain altitude*/longitude*/*.png hierarchy.
-           Do NOT use 'data' or 'Data' directly - use data\\train-sample, data\\train, or data\\test
+           Do NOT use 'data' or 'Data' directly - use data/train-sample, data/train, or data/test
 
 Expected data structure within the specified data_folder:
   data_folder/
@@ -1263,7 +1263,7 @@ Expected data structure within the specified data_folder:
             
             for dataset in available:
                 if dataset['key'] in ['train-sample', 'train', 'test'] and dataset['is_valid']:
-                    cmd = f"python code\\crater_detector_final.py --data_folder {dataset['path']} --output {dataset['suggested_output']}"
+                    cmd = f"python code/crater_detector_final.py --data_folder {dataset['path']} --output {dataset['suggested_output']}"
                     if dataset['has_ground_truth']:
                         cmd += " --evaluate"
                     print(f"  # {dataset['name']}")
@@ -1280,7 +1280,7 @@ Expected data structure within the specified data_folder:
             print("ERROR: No data folder specified!")
             print("="*70)
             print("\nQuick start (from repo root):")
-            print("  python code/crater_detector_final.py --data_folder data\train-sample --output results/detections.csv --evaluate")
+            print("  python code/crater_detector_final.py --data_folder data/train-sample --output results/detections.csv --evaluate")
             sys.exit(1)
     
     # ======================================================================== 
