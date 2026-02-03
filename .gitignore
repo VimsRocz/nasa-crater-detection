@@ -40,3 +40,12 @@ dmypy.json
 
 # PDFs
 *.pdf
+
+# Local scratch outputs (generated locally, not committed)
+code/create_submission.py
+code/train_sample_detections.csv
+data_combiner.py
+scorer.py
+train-sample-gt.csv
+detections_v2*.csv
+final_detections.csv
