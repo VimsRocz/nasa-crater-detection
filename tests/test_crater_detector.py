@@ -5,8 +5,8 @@ from pathlib import Path
 
 def _load_crater_detector_module():
     repo_root = Path(__file__).resolve().parents[1]
-    module_path = repo_root / "code" / "crater_detector.py"
-    spec = importlib.util.spec_from_file_location("crater_detector", module_path)
+    module_path = repo_root / "code" / "crater_detector_final.py"
+    spec = importlib.util.spec_from_file_location("crater_detector_final", module_path)
     if spec is None or spec.loader is None:  # pragma: no cover
         raise RuntimeError(f"Failed to load module spec for {module_path}")
     module = importlib.util.module_from_spec(spec)
@@ -35,7 +35,7 @@ def test_validate_data_folder_wrong_structure_with_pngs(tmp_path):
     detector = MODULE.CraterDetector()
     ok, msg, image_files = detector.validate_data_folder(str(tmp_path))
     assert ok is False
-    assert "folder structure is incorrect" in msg
+    assert "Expected:" in msg
     assert image_files == []
 
 

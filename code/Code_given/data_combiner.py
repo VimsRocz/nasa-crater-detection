@@ -1,7 +1,7 @@
-import os
-import csv
 import argparse
+import csv
 import math
+import os
 from typing import List, Set
 
 
@@ -21,19 +21,19 @@ def combine_detections(root_dir: str, out_path: str) -> int:
     image_ids_written: Set[str] = set()
 
     for dirpath, _, files in os.walk(root_dir):
-        if 'detections.csv' in files:
+        if "detections.csv" in files:
             csv_paths.append(os.path.join(dirpath, "detections.csv"))
-        if not 'truth' in dirpath:
+        if "truth" not in dirpath:
             norm = os.path.normpath(dirpath)
             dirparts = [part for part in norm.split(os.sep) if part]
-                    
+
             for f in files:
-                if f.endswith('.png'):
+                if f.endswith(".png"):
                     # Build ID from the full path parts: 4th-from-last and 3rd-from-last.
                     # join using os.path.join so it is platform-correct
                     id = os.path.join(dirparts[-2], dirparts[-1], f[:-4])  # remove .png
                     image_ids.add(id)
-    
+
     if not csv_paths:
         return 0
 
@@ -54,7 +54,7 @@ def combine_detections(root_dir: str, out_path: str) -> int:
         "boundingBoxMinY(px)",
         "boundingBoxMaxX(px)",
         "boundingBoxMaxY(px)",
-        "crater_id_Robbins"
+        "crater_id_Robbins",
     ]
 
     # remove any dropped columns from header union while preserving order
@@ -75,7 +75,6 @@ def combine_detections(root_dir: str, out_path: str) -> int:
         writer = csv.DictWriter(out_f, fieldnames=header_union)
         writer.writeheader()
         for p in csv_paths:
-            reldir = os.path.relpath(os.path.dirname(p), root_dir)
             with open(p, newline="", encoding="utf-8") as in_f:
                 reader = csv.DictReader(in_f)
                 for row in reader:
@@ -89,7 +88,7 @@ def combine_detections(root_dir: str, out_path: str) -> int:
                     parts = [part for part in norm.split(os.sep) if part]
                     # join using os.path.join so it is platform-correct
                     source_val = os.path.join(parts[-4], parts[-3])
-                
+
                     # Combine source and inputImage into a single inputImage column.
                     img_val = row.get("inputImage", "") or ""
                     # remove trailing .png if present (case-insensitive)
@@ -97,7 +96,7 @@ def combine_detections(root_dir: str, out_path: str) -> int:
                         img_val = img_val[:-4]
 
                     combined = os.path.join(source_val, img_val) if img_val else source_val
-                    
+
                     # set the combined value back to inputImage and remove source key
                     row["inputImage"] = combined
                     row.pop("source", None)
@@ -105,10 +104,10 @@ def combine_detections(root_dir: str, out_path: str) -> int:
                     # check if this crater passes all criteria to be written
                     cx = float(row.get("ellipseCenterX(px)"))
                     if cx < 0 or cx >= 2592:
-                        continue    
+                        continue
                     cy = float(row.get("ellipseCenterY(px)"))
                     if cy < 0 or cy >= 2048:
-                        continue    
+                        continue
                     a = float(row.get("ellipseSemimajor(px)"))
                     b = float(row.get("ellipseSemiminor(px)"))
                     alpha = float(row.get("ellipseRotation(deg)"))
@@ -122,7 +121,7 @@ def combine_detections(root_dir: str, out_path: str) -> int:
                     if cx - dx < 0 or cx + dx >= 2592:
                         continue
                     if cy - dy < 0 or cy + dy >= 2048:
-                        continue   
+                        continue
                     if 2 * (dx + dy) > 0.6 * 2048:
                         continue
 
@@ -162,14 +161,16 @@ def combine_detections(root_dir: str, out_path: str) -> int:
                     if field == "inputImage":
                         out_row[field] = id
                     else:
-                        out_row[field] = "-1" 
+                        out_row[field] = "-1"
                 writer.writerow(out_row)
 
     return rows_written
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Combine detections.csv files under a directory tree.")
+    parser = argparse.ArgumentParser(
+        description="Combine detections.csv files under a directory tree."
+    )
     # ignore the defaults here, or rewrite them to match your setup
     parser.add_argument("--root", default="../data/train", help="Root directory to walk")
     parser.add_argument("--out", default="./train-gt.csv", help="Output CSV path")

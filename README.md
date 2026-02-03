@@ -278,7 +278,7 @@ python -m pytest
 
 ## Creating a Submission ZIP (Topcoder)
 
-After generating a `solution.csv` (for example by running `code/crater_detector.py`), you can build a submission zip:
+After generating a `solution.csv` (for example by running `code/crater_detector_final.py`), you can build a submission zip:
 
 ```bash
 python create_submission.py

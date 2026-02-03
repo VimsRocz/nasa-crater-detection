@@ -143,7 +143,10 @@ def main() -> int:
         "--crater_detector",
         type=Path,
         default=None,
-        help='Path to crater_detector.py (default: "<base_dir>/code/crater_detector.py")',
+        help=(
+            'Path to detector script (default: "<base_dir>/code/crater_detector_final.py" if present, '
+            'otherwise "<base_dir>/code/crater_detector.py")'
+        ),
     )
     parser.add_argument(
         "--output",
@@ -155,9 +158,12 @@ def main() -> int:
 
     base_dir = args.base_dir.resolve()
     solution_csv = (args.solution or (base_dir / "solution.csv")).resolve()
-    crater_detector_py = (
-        args.crater_detector or (base_dir / "code" / "crater_detector.py")
-    ).resolve()
+    if args.crater_detector is not None:
+        crater_detector_py = args.crater_detector.resolve()
+    else:
+        preferred = base_dir / "code" / "crater_detector_final.py"
+        fallback = base_dir / "code" / "crater_detector.py"
+        crater_detector_py = (preferred if preferred.exists() else fallback).resolve()
     output_zip = (
         (base_dir / args.output).resolve()
         if not args.output.is_absolute()
