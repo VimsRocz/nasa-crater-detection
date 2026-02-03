@@ -1,0 +1,19 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  "data_archives",
+  "sample_data",
+  "scorer-out",
+  "scoring_results",
+  "scoring_v2",
+  "submission_temp",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

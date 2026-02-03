@@ -5,16 +5,38 @@ data/
 output_train-sample.csv
 train-gt.csv
 
+# Local datasets / challenge artifacts (not committed)
+data_archives/
+sample_data/
+sample-submission/
+scorer-out/
+scoring_results/
+scoring_v2/
+submission_temp/
+
 # Virtual environment
 venv/
 .venv/
 
 # Python cache
 __pycache__/
-*.pyc
+*.py[codz]
+*$py.class
 
-# Results
+# Test / coverage / lint cache
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
 
 # PDFs
 *.pdf

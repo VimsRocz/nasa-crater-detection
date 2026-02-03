@@ -1,7 +1,9 @@
 # NASA Lunar Crater Detection Challenge
 
+[![CI](https://github.com/VimsRocz/nasa-crater-detection/actions/workflows/ci.yml/badge.svg)](https://github.com/VimsRocz/nasa-crater-detection/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Overview
 
@@ -33,10 +35,15 @@ This project addresses these challenges by developing robust methods that can re
 
 ```
 nasa-crater-detection/
+├── .github/                 # CI, issue templates, PR template
 ├── code/
-│   └── crater_detector_final.py    # Main detection algorithm
-├── solution/
-│   └── solution.csv          # Example output CSV file
+│   ├── crater_detector_final.py    # Recommended entrypoint
+│   ├── crater_detector.py          # Alternate detector version
+│   └── Code_given/                 # Reference scorer/combiner
+├── docs/                     # Notes, findings, and guidance
+├── results/                   # Generated outputs (detections, scoring)
+├── tests/                   # Unit tests
+├── create_submission.py      # Build Topcoder submission zip
 ├── README.md                  # This file
 └── .gitignore                # Python gitignore
 ```
@@ -51,20 +58,6 @@ nasa-crater-detection/
 ### Required Python Libraries
 
 Install dependencies using pip:
-
-```bash
-pip install opencv-python numpy pandas
-```
-
-Or create a requirements.txt:
-
-```
-opencv-python>=4.8.0
-numpy>=1.24.0
-pandas>=2.0.0
-```
-
-Then install:
 
 ```bash
 pip install -r requirements.txt
@@ -97,6 +90,7 @@ python code/crater_detector_final.py --data_folder ./sample_data --output soluti
 - `--data_folder`: Path to the folder containing test images (required for detection)
 - `--output`: **(Optional)** Output CSV file path (default: `solution.csv`)
 - `--generate_sample`: **(Optional)** Generate sample test data in the specified folder for testing
+- `--auto_generate`: **(Optional)** If `--data_folder` does not exist, generate sample data into `sample_data/` and run detection
 
 ### Getting the Real Dataset
 
@@ -259,7 +253,9 @@ This implementation is inspired by academic research on crater detection:
 
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
+Contributions are welcome — see `CONTRIBUTING.md`.
+
+Areas for improvement:
 
 - Enhanced ellipse fitting algorithms
 - Better crater classification methods
@@ -269,7 +265,24 @@ Contributions are welcome! Areas for improvement:
 
 ## License
 
-MIT License - Feel free to use this code for research and competition purposes.
+MIT License - see `LICENSE`.
+
+## Development
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m ruff check .
+python -m ruff format .
+python -m pytest
+```
+
+## Creating a Submission ZIP (Topcoder)
+
+After generating a `solution.csv` (for example by running `code/crater_detector.py`), you can build a submission zip:
+
+```bash
+python create_submission.py
+```
 
 ## Author
 
